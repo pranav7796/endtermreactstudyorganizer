@@ -1,7 +1,6 @@
 import axios from 'axios'
 
 // Using JSONPlaceholder as a mock API
-// In a real app, you would replace these URLs with your actual API endpoints
 const API_URL = 'https://jsonplaceholder.typicode.com'
 
 // Create axios instance
@@ -12,19 +11,26 @@ const api = axios.create({
   }
 })
 
+// Initialize local storage with default data if empty
+function initializeLocalStorage() {
+  if (!localStorage.getItem('subjects')) {
+    localStorage.setItem('subjects', '[]')
+  }
+  if (!localStorage.getItem('tasks')) {
+    localStorage.setItem('tasks', '[]')
+  }
+  if (!localStorage.getItem('notes')) {
+    localStorage.setItem('notes', '[]')
+  }
+}
+
+initializeLocalStorage()
+
 // Fetch all subjects
 export async function fetchSubjects() {
   try {
-    // Using JSONPlaceholder's users endpoint as a mock for subjects
-    const response = await api.get('/users')
-    
-    // Transform the data to match our app's subject structure
-    return response.data.slice(0, 5).map(user => ({
-      id: user.id,
-      name: user.name,
-      description: `Study materials for ${user.name}`,
-      color: getRandomColor()
-    }))
+    const subjects = JSON.parse(localStorage.getItem('subjects') || '[]')
+    return subjects
   } catch (error) {
     console.error('Error fetching subjects:', error)
     throw error
@@ -34,12 +40,14 @@ export async function fetchSubjects() {
 // Add a new subject
 export async function addSubject(subject) {
   try {
-    const response = await api.post('/users', subject)
-    return {
-      ...response.data,
+    const subjects = JSON.parse(localStorage.getItem('subjects') || '[]')
+    const newSubject = {
       ...subject,
-      id: Date.now() // Ensure unique ID in our frontend
+      id: Date.now()
     }
+    subjects.push(newSubject)
+    localStorage.setItem('subjects', JSON.stringify(subjects))
+    return newSubject
   } catch (error) {
     console.error('Error adding subject:', error)
     throw error
@@ -49,7 +57,21 @@ export async function addSubject(subject) {
 // Remove a subject
 export async function removeSubject(id) {
   try {
-    await api.delete(`/users/${id}`)
+    const subjects = JSON.parse(localStorage.getItem('subjects') || '[]')
+    const tasks = JSON.parse(localStorage.getItem('tasks') || '[]')
+    const notes = JSON.parse(localStorage.getItem('notes') || '[]')
+    
+    // Remove subject
+    const filteredSubjects = subjects.filter(subject => subject.id !== id)
+    localStorage.setItem('subjects', JSON.stringify(filteredSubjects))
+    
+    // Remove related tasks and notes
+    const filteredTasks = tasks.filter(task => task.subjectId !== id)
+    const filteredNotes = notes.filter(note => note.subjectId !== id)
+    
+    localStorage.setItem('tasks', JSON.stringify(filteredTasks))
+    localStorage.setItem('notes', JSON.stringify(filteredNotes))
+    
     return id
   } catch (error) {
     console.error('Error removing subject:', error)
@@ -60,17 +82,8 @@ export async function removeSubject(id) {
 // Fetch all tasks
 export async function fetchTasks() {
   try {
-    // Using JSONPlaceholder's todos endpoint
-    const response = await api.get('/todos')
-    
-    // Transform the data to match our app's task structure
-    return response.data.slice(0, 10).map(todo => ({
-      id: todo.id,
-      title: todo.title,
-      completed: todo.completed,
-      subjectId: (todo.id % 5) + 1, // Assign to subjects 1-5
-      dueDate: getRandomFutureDate()
-    }))
+    const tasks = JSON.parse(localStorage.getItem('tasks') || '[]')
+    return tasks
   } catch (error) {
     console.error('Error fetching tasks:', error)
     throw error
@@ -80,12 +93,14 @@ export async function fetchTasks() {
 // Add a new task
 export async function addTask(task) {
   try {
-    const response = await api.post('/todos', task)
-    return {
-      ...response.data,
+    const tasks = JSON.parse(localStorage.getItem('tasks') || '[]')
+    const newTask = {
       ...task,
-      id: Date.now() // Ensure unique ID in our frontend
+      id: Date.now()
     }
+    tasks.push(newTask)
+    localStorage.setItem('tasks', JSON.stringify(tasks))
+    return newTask
   } catch (error) {
     console.error('Error adding task:', error)
     throw error
@@ -95,16 +110,11 @@ export async function addTask(task) {
 // Toggle task completion status
 export async function toggleTask(id) {
   try {
-    // First get the current task to toggle its status
-    const currentTasks = await fetchTasks()
-    const task = currentTasks.find(t => t.id === id)
-    
-    if (!task) throw new Error('Task not found')
-    
-    await api.patch(`/todos/${id}`, {
-      completed: !task.completed
-    })
-    
+    const tasks = JSON.parse(localStorage.getItem('tasks') || '[]')
+    const updatedTasks = tasks.map(task => 
+      task.id === id ? { ...task, completed: !task.completed } : task
+    )
+    localStorage.setItem('tasks', JSON.stringify(updatedTasks))
     return id
   } catch (error) {
     console.error('Error toggling task:', error)
@@ -115,7 +125,9 @@ export async function toggleTask(id) {
 // Remove a task
 export async function removeTask(id) {
   try {
-    await api.delete(`/todos/${id}`)
+    const tasks = JSON.parse(localStorage.getItem('tasks') || '[]')
+    const filteredTasks = tasks.filter(task => task.id !== id)
+    localStorage.setItem('tasks', JSON.stringify(filteredTasks))
     return id
   } catch (error) {
     console.error('Error removing task:', error)
@@ -126,17 +138,8 @@ export async function removeTask(id) {
 // Fetch all notes
 export async function fetchNotes() {
   try {
-    // Using JSONPlaceholder's posts endpoint as a mock for notes
-    const response = await api.get('/posts')
-    
-    // Transform the data to match our app's note structure
-    return response.data.slice(0, 8).map(post => ({
-      id: post.id,
-      title: post.title.slice(0, 30),
-      content: post.body,
-      subjectId: (post.id % 5) + 1, // Assign to subjects 1-5
-      createdAt: getRandomPastDate()
-    }))
+    const notes = JSON.parse(localStorage.getItem('notes') || '[]')
+    return notes
   } catch (error) {
     console.error('Error fetching notes:', error)
     throw error
@@ -146,13 +149,15 @@ export async function fetchNotes() {
 // Add a new note
 export async function addNote(note) {
   try {
-    const response = await api.post('/posts', note)
-    return {
-      ...response.data,
+    const notes = JSON.parse(localStorage.getItem('notes') || '[]')
+    const newNote = {
       ...note,
-      id: Date.now(), // Ensure unique ID in our frontend
+      id: Date.now(),
       createdAt: new Date().toISOString()
     }
+    notes.push(newNote)
+    localStorage.setItem('notes', JSON.stringify(notes))
+    return newNote
   } catch (error) {
     console.error('Error adding note:', error)
     throw error
@@ -162,7 +167,9 @@ export async function addNote(note) {
 // Remove a note
 export async function removeNote(id) {
   try {
-    await api.delete(`/posts/${id}`)
+    const notes = JSON.parse(localStorage.getItem('notes') || '[]')
+    const filteredNotes = notes.filter(note => note.id !== id)
+    localStorage.setItem('notes', JSON.stringify(filteredNotes))
     return id
   } catch (error) {
     console.error('Error removing note:', error)
@@ -181,20 +188,4 @@ function getRandomColor() {
     'bg-indigo-100 text-indigo-800'
   ]
   return colors[Math.floor(Math.random() * colors.length)]
-}
-
-// Helper function to generate random future dates
-function getRandomFutureDate() {
-  const today = new Date()
-  const futureDate = new Date(today)
-  futureDate.setDate(today.getDate() + Math.floor(Math.random() * 14) + 1) // Random day in the next 2 weeks
-  return futureDate.toISOString().split('T')[0] // Format as YYYY-MM-DD
-}
-
-// Helper function to generate random past dates
-function getRandomPastDate() {
-  const today = new Date()
-  const pastDate = new Date(today)
-  pastDate.setDate(today.getDate() - Math.floor(Math.random() * 30)) // Random day in the past month
-  return pastDate.toISOString()
 }
